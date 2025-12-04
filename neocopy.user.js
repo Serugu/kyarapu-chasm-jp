@@ -3,7 +3,7 @@
 // @namespace   https://github.com/chasm-js
 // @version     KYARAPU-NCPY-v1.0.6
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
-// @author      chasm-js, milkyway0308, succii(Dr.MJ), Serugu
+// @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/builder*
 // @match       https://kyarapu.com/my-character*
 // @downloadURL https://github.com/Serugu/kyarapu-chasm-jp/raw/main/neocopy.user.js
