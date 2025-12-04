@@ -48,5 +48,5 @@
 
 元のスクリプト (Crystallized Chasm) のライセンスに準拠します。
 Original work by milkyway0308.
-Ported to JP version by chasm-js.
+Ported to JP version by chasm-js & Serugu.
 
