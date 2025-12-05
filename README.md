@@ -1,7 +1,7 @@
 # Kyarapu Chasm JP
 
-日本版「キャラプ (kyarapu.com)」向けのユーザースクリプト集です。
-韓国版Crystallized Chasmの各機能を日本版に移植・最適化しています。
+日本版[「キャラプ」]( https://kyarapu.com)向けのユーザースクリプト集です。
+[韓国版Crystallized Chasm](https://github.com/milkyway0308/crystallized-chasm)の各機能を日本版に移植・最適化しています。
 
 ---
 
@@ -29,6 +29,16 @@
 - ⏱️ チャット画面上部にターン数を表示
 - 💾 カウントはIndexedDBに保存（ページをリロードしても維持）
 - 🔄 リアルタイムでカウント更新
+
+### 3. Kyarapu Chasm Burner (burner.user.js)
+AIを使用してチャットの履歴を要約し、キャラクターの記憶として保存・圧縮するツール（通称: バーナー）
+
+👉 **[インストール](https://github.com/Serugu/kyarapu-chasm-jp/raw/main/burner.user.js)**
+
+**機能:**
+- 🔥 チャット履歴をAI（Gemini / OpenRouter）で要約
+- 📝 要約内容を編集してキャラクターのメモリに送信
+- 🎭 userのペルソナ（プロフィール）を簡単に切り替え・編集
 
 ---
 
@@ -62,6 +72,12 @@
 ### Crystallized Counter
 - チャット画面を開くと、自動的に画面上部中央にカウンターが表示されます
 - ターン数はAIの応答回数をカウントします（ユーザーの発言は含まない）
+
+### Kyarapu Chasm Burner
+- キャラクターのチャット画面サイドバーに「🔥 キャズムバーナー」ボタンが追加されます
+- クリックすると設定・実行画面が開きます
+- **APIキーの設定**: Google Gemini API または OpenRouter APIキーが必要です
+- **ペルソナ切替**: サイドバーからuserプロフィールの切り替えや編集が可能です
 
 ---
 
