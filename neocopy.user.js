@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy (キャラプ キャズム ネオコピー)
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.1.1
+// @version     KYARAPU-NCPY-v1.2.0
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/builder*
@@ -11,7 +11,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.1.1";
+const VERSION = "KYARAPU-NCPY-v1.2.0";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -344,11 +344,13 @@ GM_addStyle(`
     /**
      * キャラクターデータを更新（貼り付け用）
      * APIが期待する形式に変換して送信
-     * 常にPATCHを使用（type=createでもURLにcharacter IDがある＝サーバー側で空キャラが既に存在）
+     * - 新規キャラ (type=create): POST /character-drafts で下書き保存
+     * - 既存キャラ (type=edit): PATCH /characters/{id} で更新
      */
     async function updateCharacterData(characterId, data) {
         try {
-            log(`更新データを準備中... (PATCH ${characterId})`);
+            const isNew = isNewCharacter();
+            log(`更新データを準備中... (${isNew ? '下書き保存モード' : '編集モード'})`);
 
             // APIが期待する形式に変換
             const updateData = {
@@ -366,7 +368,6 @@ GM_addStyle(`
             };
 
             // 安心フィルター設定（isAdult）
-            // 注意: キャラプの仕様上、既存キャラの安心フィルター設定は変更できない
             if (typeof data.isAdult === 'boolean') {
                 updateData.isAdult = data.isAdult;
             }
@@ -419,10 +420,33 @@ GM_addStyle(`
             console.log("送信するデータ:", updateData);
             console.log("更新するフィールド:", Object.keys(updateData));
 
-            // 常にPATCHを使用（type=createでもURLにIDがある＝サーバー側で空キャラが既に存在）
-            const url = `${API_BASE_URL}/kyarapu/characters/${characterId}`;
-            log(`キャラ更新: PATCH ${url}`);
-            const response = await authFetch('PATCH', url, updateData);
+            let url, method, response;
+
+            if (isNew) {
+                // 新規キャラクターの場合: POST /character-drafts で下書き保存
+                url = `${API_BASE_URL}/kyarapu/character-drafts`;
+                method = 'POST';
+                
+                // 下書き保存用のデータ形式（characterIdを追加）
+                const draftData = {
+                    characterId: characterId,
+                    ...updateData
+                };
+                
+                log(`下書き保存: POST ${url}`);
+                console.log("下書き保存データ:", draftData);
+                response = await authFetch(method, url, draftData);
+                
+                if (response && response.data) {
+                    log(`下書き保存成功: characterDraftId=${response.data.characterDraftId}`);
+                }
+            } else {
+                // 既存キャラクターの場合: PATCH /characters/{id} で更新
+                url = `${API_BASE_URL}/kyarapu/characters/${characterId}`;
+                method = 'PATCH';
+                log(`キャラ更新: PATCH ${url}`);
+                response = await authFetch(method, url, updateData);
+            }
 
             return response;
         } catch (error) {
