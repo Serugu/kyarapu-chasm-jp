@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy (キャラプ キャズム ネオコピー)
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.0
+// @version     KYARAPU-NCPY-v1.2.1
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/builder*
@@ -11,7 +11,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.0";
+const VERSION = "KYARAPU-NCPY-v1.2.1";";";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -250,6 +250,12 @@ GM_addStyle(`
 
         if (!response.ok) {
             const errorText = await response.text();
+            
+            // 下書き保存の上限エラー判定
+            if (response.status === 400 && errorText.includes("draft")) {
+                throw new Error(`下書き保存の上限に達しました。不要な下書きを削除してください。\n(サーバーからの応答: ${errorText})`);
+            }
+            
             throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
@@ -553,8 +559,20 @@ GM_addStyle(`
         }
 
         if (!pasteData.name) {
-            alert("❌ 有効なキャラクターデータではありません。");
+            alert("❌ 有効なキャラクターデータではありません（名前がありません）。");
             return;
+        }
+
+        // データの健全性チェック（重要なフィールドが欠けていないか）
+        const missingFields = [];
+        if (pasteData.description === undefined) missingFields.push("説明");
+        if (pasteData.characterDetails === undefined) missingFields.push("詳細設定");
+        if (pasteData.customPrompt === undefined) missingFields.push("カスタムプロンプト");
+
+        if (missingFields.length > 0) {
+            if (!confirm(`⚠️ 警告: 以下のデータが含まれていません。\n[ ${missingFields.join(", ")} ]\n\n貼り付けると、現在のデータが空白で上書きされ、消去されます。\n本当に続行しますか？`)) {
+                return;
+            }
         }
 
         const confirmMessage = `以下のデータを現在のキャラクターに上書きしますか？\n\n` +
