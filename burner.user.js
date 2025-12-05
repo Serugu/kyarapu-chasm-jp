@@ -731,6 +731,9 @@
             button:disabled { background-color: #28327c !important; cursor: not-allowed !important; }
             .modal-h3 { margin-top: 15px; margin-bottom: 10px; border-top: 1px solid #444; padding-top: 15px; }
             a { color: #7289da; }
+            @media (prefers-color-scheme: dark) {
+                #chasmBurner { background-color: #2c2f33; color: white; }
+            }
         `;
         document.head.insertAdjacentHTML('beforeend', `<style>${styleHTML}</style>`);
         document.body.insertAdjacentHTML('beforeend', modalHTML);
