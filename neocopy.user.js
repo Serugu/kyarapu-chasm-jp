@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy (キャラプ キャズム ネオコピー)
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.1.0
+// @version     KYARAPU-NCPY-v1.1.1
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/builder*
@@ -11,7 +11,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.1.0";
+const VERSION = "KYARAPU-NCPY-v1.1.1";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -192,6 +192,16 @@ GM_addStyle(`
      */
     function isBuilderPage() {
         return window.location.pathname.includes('/builder');
+    }
+
+    /**
+     * 新規キャラクター作成モードかどうか
+     * URLの type=create パラメータで判定
+     */
+    function isNewCharacter() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const type = urlParams.get('type');
+        return type === 'create';
     }
 
     /**
@@ -537,7 +547,13 @@ GM_addStyle(`
 
         try {
             await updateCharacterData(characterId, pasteData);
-            alert("✅ キャラクターデータを貼り付けました。\nページを更新して変更を確認してください。");
+            
+            if (isNewCharacter()) {
+                // 新規キャラの場合は下書き保存状態になる
+                alert("✅ キャラクターデータを下書き保存しました。\n\n⚠️ キャラクターを登録するには、ページ更新後に画面上部の「登録」ボタンを押してください。");
+            } else {
+                alert("✅ キャラクターデータを貼り付けました。\nページを更新して変更を確認してください。");
+            }
 
             if (confirm("ページを更新しますか？")) {
                 window.location.reload();
@@ -647,7 +663,13 @@ GM_addStyle(`
                     }
 
                     await updateCharacterData(characterId, characterData);
-                    alert("✅ インポートが完了しました。\nページを更新して変更を確認してください。");
+                    
+                    if (isNewCharacter()) {
+                        // 新規キャラの場合は下書き保存状態になる
+                        alert("✅ インポートして下書き保存しました。\n\n⚠️ キャラクターを登録するには、ページ更新後に画面上部の「登録」ボタンを押してください。");
+                    } else {
+                        alert("✅ インポートが完了しました。\nページを更新して変更を確認してください。");
+                    }
 
                     if (confirm("ページを更新しますか？")) {
                         window.location.reload();
