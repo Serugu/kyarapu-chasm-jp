@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Crystallized Counter
 // @namespace   https://github.com/Serugu/kyarapu-chasm-jp
-// @version     KYARAPU-CNTR-JP-v1.3.0
+// @version     KYARAPU-CNTR-JP-v1.3.1
 // @description キャラプのチャットにターンカウンターを追加します。韓国版Crystallized Chasmの日本版移植です。
 // @author      milkyway0308 (Original), Serugu (JP Port)
 // @match       https://kyarapu.com/*
@@ -514,8 +514,22 @@
   //                   Initialization
   // =====================================================
 
+  /**
+   * カウンター要素を削除する
+   */
+  function removeCounter() {
+    const counter = document.getElementById("chasm-counter-indicator");
+    if (counter) {
+      counter.remove();
+      log("カウンターを削除しました（チャットページ外）");
+    }
+  }
+
   function setup() {
-    if (!isChatCounterEnabled()) return;
+    if (!isChatCounterEnabled()) {
+      removeCounter();
+      return;
+    }
     injectElement();
   }
 
