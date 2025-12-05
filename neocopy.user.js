@@ -1,17 +1,16 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.1
+// @version     KYARAPU-NCPY-v1.2.2
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
-// @match       https://kyarapu.com/builder*
-// @match       https://kyarapu.com/my-character*
+// @match       https://kyarapu.com/*
 // @downloadURL https://github.com/Serugu/kyarapu-chasm-jp/raw/main/neocopy.user.js
 // @updateURL   https://github.com/Serugu/kyarapu-chasm-jp/raw/main/neocopy.user.js
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.1";
+const VERSION = "KYARAPU-NCPY-v1.2.2";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -773,9 +772,10 @@ GM_addStyle(`
         const existingToggle = document.getElementById('chasm-neocopy-toggle');
         if (existingToggle) existingToggle.remove();
 
-        // Neo-Copy機能が利用可能でなければUIを表示しない
+        // Neo-Copy機能が利用可能でなければここで終了
         if (!isNeoCopyAvailable()) {
-            log("Neo-Copy機能が利用できないページです（ビルダーページでキャラクターIDが必要）");
+            // ログは多すぎるので、必要な時だけ出すか、ページ遷移時のみ出すように制御
+            // log("Neo-Copy機能が利用できないページです");
             return;
         }
 
@@ -937,25 +937,50 @@ GM_addStyle(`
     // =====================================================
 
     function initialize() {
-        // ページ読み込み完了後にUI作成
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', createUI);
-        } else {
-            createUI();
-        }
+        log(`初期化開始: ${location.href}`);
+        
+        // 初回実行
+        createUI();
 
-        // URL変更を監視（SPAナビゲーション対応）
+        // URL変更監視 (SPA対応)
+        // history.pushState と replaceState をフック
+        const originalPushState = history.pushState;
+        history.pushState = function() {
+            originalPushState.apply(this, arguments);
+            log("History pushState detected");
+            setTimeout(createUI, 500); // DOM更新を待つために少し遅延
+        };
+
+        const originalReplaceState = history.replaceState;
+        history.replaceState = function() {
+            originalReplaceState.apply(this, arguments);
+            log("History replaceState detected");
+            setTimeout(createUI, 500);
+        };
+
+        // popstate (ブラウザの戻る/進む) を監視
+        window.addEventListener('popstate', () => {
+            log("Popstate detected");
+            setTimeout(createUI, 500);
+        });
+
+        // 念のため MutationObserver も維持（URLが変わらなくてもDOMが変わるケース用）
         let lastUrl = location.href;
         new MutationObserver(() => {
             if (location.href !== lastUrl) {
                 lastUrl = location.href;
+                log(`URL変更検知 (Observer): ${lastUrl}`);
                 setTimeout(createUI, 500);
             }
         }).observe(document.body, { childList: true, subtree: true });
 
-        log(`Kyarapu Chasm Neo-Copy ${VERSION} 初期化完了`);
+        log(`Kyarapu Chasm Neo-Copy ${VERSION} 監視開始`);
     }
 
-    initialize();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
 })();
 
