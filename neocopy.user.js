@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy (キャラプ キャズム ネオコピー)
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.0.6
+// @version     KYARAPU-NCPY-v1.0.8
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/builder*
@@ -11,7 +11,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARA-NCPY-v1.0.7";
+const VERSION = "KYARAPU-NCPY-v1.0.8";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -195,6 +195,16 @@ GM_addStyle(`
     }
 
     /**
+     * 新規キャラクター作成モードかどうか
+     * URLの type=create パラメータで判定
+     */
+    function isNewCharacter() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const type = urlParams.get('type');
+        return type === 'create';
+    }
+
+    /**
      * Neo-Copy機能が利用可能なページかどうか
      * - ビルダーページでキャラクターIDがある場合
      */
@@ -334,10 +344,12 @@ GM_addStyle(`
     /**
      * キャラクターデータを更新（貼り付け用）
      * APIが期待する形式に変換して送信
+     * 新規キャラ（type=create）の場合はPOST、既存キャラ（type=edit）の場合はPATCH
      */
     async function updateCharacterData(characterId, data) {
         try {
-            log("更新データを準備中...");
+            const isNew = isNewCharacter();
+            log(`更新データを準備中... (${isNew ? '新規作成モード' : '編集モード'})`);
 
             // APIが期待する形式に変換
             const updateData = {
@@ -402,8 +414,27 @@ GM_addStyle(`
             console.log("送信するデータ:", updateData);
             console.log("更新するフィールド:", Object.keys(updateData));
 
-            const url = `${API_BASE_URL}/kyarapu/characters/${characterId}`;
-            const response = await authFetch('PATCH', url, updateData);
+            let url, method, response;
+
+            if (isNew) {
+                // 新規キャラクターの場合: POST /kyarapu/characters
+                url = `${API_BASE_URL}/kyarapu/characters`;
+                method = 'POST';
+                log(`新規キャラ作成: POST ${url}`);
+                response = await authFetch(method, url, updateData);
+                
+                // POSTのレスポンスは { data: {...}, status: "success" } 形式
+                if (response && response.data) {
+                    log(`新規キャラ作成成功: ${response.data.name} (ID: ${response.data._id})`);
+                }
+            } else {
+                // 既存キャラクターの場合: PATCH /kyarapu/characters/{id}
+                url = `${API_BASE_URL}/kyarapu/characters/${characterId}`;
+                method = 'PATCH';
+                log(`既存キャラ更新: PATCH ${url}`);
+                response = await authFetch(method, url, updateData);
+            }
+
             return response;
         } catch (error) {
             logError(`キャラクターデータの更新に失敗: ${error.message}`);
@@ -526,8 +557,14 @@ GM_addStyle(`
         }
 
         try {
-            await updateCharacterData(characterId, pasteData);
-            alert("✅ キャラクターデータを貼り付けました。\nページを更新して変更を確認してください。");
+            const isNew = isNewCharacter();
+            const result = await updateCharacterData(characterId, pasteData);
+            
+            if (isNew) {
+                alert("✅ キャラクターデータを新規作成しました。\nページを更新して変更を確認してください。");
+            } else {
+                alert("✅ キャラクターデータを貼り付けました。\nページを更新して変更を確認してください。");
+            }
 
             if (confirm("ページを更新しますか？")) {
                 window.location.reload();
@@ -636,8 +673,14 @@ GM_addStyle(`
                         return;
                     }
 
+                    const isNew = isNewCharacter();
                     await updateCharacterData(characterId, characterData);
-                    alert("✅ インポートが完了しました。\nページを更新して変更を確認してください。");
+                    
+                    if (isNew) {
+                        alert("✅ インポート＆新規作成が完了しました。\nページを更新して変更を確認してください。");
+                    } else {
+                        alert("✅ インポートが完了しました。\nページを更新して変更を確認してください。");
+                    }
 
                     if (confirm("ページを更新しますか？")) {
                         window.location.reload();
