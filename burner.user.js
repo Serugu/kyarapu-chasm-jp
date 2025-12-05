@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyarapu Chasm burner
 // @namespace    https://github.com/chasm-js
-// @version      KYARA-BURN-v2.1.1
+// @version      KYARA-BURN-v2.1.2
 // @description  最初に日本語版を作ってくれたsuccii(Dr.MJ)に感謝。最新版がバグで動作しなかったため、独自に修正・改善を行ったバージョンです。
 // @author       chasm-js, milkyway0308, succii(Dr.MJ), Serugu
 // @match        https://kyarapu.com/u/*
