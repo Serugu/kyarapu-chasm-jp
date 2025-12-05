@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyarapu Chasm burner
 // @namespace    https://github.com/chasm-js
-// @version      KYARA-BURN-v2.1.0
+// @version      KYARA-BURN-v2.1.1
 // @description  最初に日本語版を作ってくれたsuccii(Dr.MJ)に感謝。最新版がバグで動作しなかったため、独自に修正・改善を行ったバージョンです。
 // @author       chasm-js, milkyway0308, succii(Dr.MJ), Serugu
 // @match        https://kyarapu.com/u/*
@@ -808,6 +808,7 @@
         font-size: 15px;
         line-height: 1.5; /* 줄 높이 조절 */
         background-color: #f0f0f0;
+        color: #333;
         border: 1px solid #ccc;
         border-radius: 4px;
         cursor: pointer;
@@ -830,7 +831,7 @@
         // 위치를 아이콘이 아닌 입력창 기준으로 변경
         personaListPanel.style.cssText = `
         display: none; position: absolute; top: 100%; left: 36px; right: 36px;
-        background-color: white; border: 1px solid #ccc; border-radius: 4px;
+        background-color: white; color: #333; border: 1px solid #ccc; border-radius: 4px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 100; max-height: 200px; overflow-y: auto;
     `;
 
@@ -850,6 +851,7 @@ editPanel.style.cssText = `
     border: 1px solid #ccc;
     border-radius: 8px;
     background-color: white;
+    color: #333;
     flex-direction: column;
     gap: 10px;
     z-index: 1001; /* 다른 요소들 위에 표시되도록 z-index를 높게 설정합니다. */
@@ -864,11 +866,11 @@ editPanel.style.cssText = `
         </div>
         <div>
             <label for="persona-name-input" style="font-size: 14px; color: #333;">プロフィール 名前</label>
-            <input id="persona-name-input" type="text" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+            <input id="persona-name-input" type="text" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 4px; background-color: white; color: #333;">
         </div>
         <div>
             <label for="persona-info-textarea" style="font-size: 14px; color: #333;">プロフィール 内容 (最大100字)</label>
-            <textarea id="persona-info-textarea" maxlength="100" style="width: 100%; height: 80px; resize: vertical; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 4px;"></textarea>
+            <textarea id="persona-info-textarea" maxlength="100" style="width: 100%; height: 80px; resize: vertical; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 4px; background-color: white; color: #333;"></textarea>
             <div id="persona-char-counter" style="text-align: right; font-size: 12px; color: #888;">0/100</div>
         </div>
         <button id="persona-save-button" style="padding: 10px; background-color: #5865f2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">保存</button>
@@ -912,7 +914,7 @@ editPanel.style.cssText = `
                 }
                 const item = document.createElement('div');
                 item.textContent = p.name;
-                item.style.cssText = `padding: 10px 12px; cursor: pointer;`;
+                item.style.cssText = `padding: 10px 12px; cursor: pointer; color: #333;`;
                 if (p._id === currentSelectedId) {
                     item.style.backgroundColor = '#007bff';
                     item.style.color = 'white';
@@ -1008,7 +1010,7 @@ editPanel.style.cssText = `
                 height: auto;
                 padding: 10px 4px;
                 background: none;
-                color: #333;
+                color: var(--text_primary, #333);
                 border: none;
                 border-radius: 6px;
                 cursor: pointer;
