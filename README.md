@@ -44,7 +44,7 @@ AIを使用してチャットの履歴を要約し、キャラクターの記憶
 
 ## 🚀 インストール方法
 
-1. ブラウザ拡張機能 **Tampermonkey** (または Violentmonkey) をインストールしてください。
+1. ブラウザ拡張機能 **Tampermonkey** をインストールしてください。
    - [Chrome版](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
    - [Firefox版](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)
    - [Edge版](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
