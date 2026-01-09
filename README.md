@@ -50,7 +50,7 @@ AIを使用してチャットの履歴を要約し、キャラクターの記憶
 - 🌍 **共通ノート**: 全キャラクターで共通して使用できるノートを作成可能
 - 📥 **自動読み込み**: 選択したノートの内容をテキストエリアに一瞬で反映
 
-### 5. Kyarapu Crystallized AlarmClock (alarm-clock.user.js)
+### 5. Kyarapu AlarmClock (alarm-clock.user.js)
 毎日の出席通知と即時出席ボタンを追加
 
 👉 **[インストール](https://github.com/Serugu/kyarapu-chasm-jp/raw/main/alarm-clock.user.js)**
