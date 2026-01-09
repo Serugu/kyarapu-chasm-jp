@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyarapu Chasm burner
 // @namespace    https://github.com/chasm-js
-// @version      KYARA-BURN-v2.1.3
+// @version      KYARA-BURN-v2.1.4
 // @description  最初に日本語版を作ってくれたsuccii(Dr.MJ)に感謝。最新版がバグで動作しなかったため、独自に修正・改善を行ったバージョンです。
 // @author       chasm-js, milkyway0308, succii(Dr.MJ), Serugu
 // @match        https://kyarapu.com/u/*
@@ -996,9 +996,36 @@
         await populatePersonas();
     }
 
+    // --- インジェクト先特定用 ---
+    function findInjectionTarget() {
+        // 動的なクラス名（.css-XXXXX）に依存せず、「チャットルーム設定」というテキストを頼りに
+        // 右側のサイドバーコンテナを特定します。
+        const elements = Array.from(document.querySelectorAll('div, p, span'));
+        const anchor = elements.find(el => (el.textContent === 'チャットルーム設定' || el.textContent === 'Chatroom Settings') && el.children.length === 0);
+
+        if (!anchor) {
+            // フォールバック: 元のクラス名も一応チェック
+            return document.querySelector(`.css-13sh4vi`);
+        }
+
+        // アンカーが見つかった場合、そこから親を辿ってメインのコンテナを見つける
+        // 通常、チャットルーム設定の見出しを包むdivの親が、アクションボタン群を持つコンテナ
+        let container = anchor.parentElement;
+        while (container && container !== document.body) {
+            // flex-colを持ち、複数の子要素（設定項目など）を持つ要素を探す
+            if (container.children.length > 2 &&
+                (window.getComputedStyle(container).display === 'flex' || container.classList.contains('flex'))) {
+                return container;
+            }
+            container = container.parentElement;
+        }
+
+        return document.querySelector(`.css-13sh4vi`);
+    }
+
     // --- 初期化 ---
     async function initialize() {
-        const target = document.querySelector(`.css-13sh4vi`);
+        const target = findInjectionTarget();
 
         if (target && !document.querySelector("#chasmWrap")) {
             const chasmWrap = document.createElement("div");
