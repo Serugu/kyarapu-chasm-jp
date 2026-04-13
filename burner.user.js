@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyarapu Chasm burner
 // @namespace    https://github.com/chasm-js
-// @version      KYARA-BURN-v2.1.6
+// @version      KYARA-BURN-v2.1.5
 // @description  最初に日本語版を作ってくれたsuccii(Dr.MJ)に感謝。最新版がバグで動作しなかったため、独自に修正・改善を行ったバージョンです。
 // @author       chasm-js, milkyway0308, succii(Dr.MJ), Serugu
 // @match        https://kyarapu.com/u/*
@@ -702,7 +702,7 @@
                             <div class="prompt-area" style="margin-top: 10px;">
                                 ${promptsData.map(p => `<textarea id="prompt-${p.id}" class="prompt-text modal-input" rows="8" style="display: ${p.id === 'p1' ? 'block' : 'none'};">${p.text.replace(/{...}/, "ここにプロンプトを入力...")}</textarea>`).join('')}
                             </div>
-                            <div class="setting-item" style="margin-top: 10px;"><label for="burner-gemini-model-select">Geminiモデル選択</label><select id="burner-gemini-model-select" class="modal-input"><option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option><option value="gemini-2.5-flash">Gemini 2.5 Flash</option><option value="gemini-2.5-pro">Gemini 2.5 Pro</option><option value="direct-input">直接入力</option></select></div>
+                            <div class="setting-item" style="margin-top: 10px;"><label for="burner-gemini-model-select">Geminiモデル選択</label><select id="burner-gemini-model-select" class="modal-input"><option value="gemini-3-flash-preview">Gemini 3.0 Flash Preview</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option><option value="gemini-2.5-flash">Gemini 2.5 Flash</option><option value="gemini-2.5-pro">Gemini 2.5 Pro</option><option value="direct-input">直接入力</option></select></div>
                             <div id="custom-gemini-model-div" class="setting-item" style="display: none; margin-top: 10px;"><label for="burner-custom-gemini-model">カスタムGeminiモデル名</label><input type="text" id="burner-custom-gemini-model" class="modal-input"></div>
                             <button id="execute-btn" class="modal-button-primary" style="margin-top: 15px;">要約開始</button>
                         </div>
