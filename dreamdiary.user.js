@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyarapu Crystallized DreamDiary
 // @namespace    https://github.com/Serugu/kyarapu-chasm-jp
-// @version      KYR-DDIA-v1.0.8
+// @version      KYR-DDIA-v1.0.9
 // @description  ユーザーノートの保存・読み込み機能を追加します。
 // @author       milkyway0308 (Original), Serugu (JP Port)
 // @match        https://kyarapu.com/*
@@ -262,11 +262,8 @@
     }
 
     function getTargetTextArea() {
-        // #web-modal配下のtextareaのみをターゲットにする
-        const modal = document.getElementById('web-modal');
-        if (!modal) return null;
-
-        const modalTA = modal.querySelector('textarea[placeholder*="忘れてはいけない"], textarea[placeholder*="キャラに必ず覚えておいてほしい"]');
+        // ドキュメント全体から該当プレースホルダーのtextareaを検索する
+        const modalTA = document.querySelector('textarea[placeholder*="忘れてはいけない"], textarea[placeholder*="キャラに必ず覚えておいてほしい"]');
         if (modalTA && modalTA.offsetParent) return modalTA;
 
         return null;
