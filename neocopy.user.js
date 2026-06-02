@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.2
+// @version     KYARAPU-NCPY-v1.2.3
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/*
@@ -10,7 +10,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.2";
+const VERSION = "KYARAPU-NCPY-v1.2.3";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -391,6 +391,14 @@ GM_addStyle(`
                 updateData.profileImageUrl = data.profileImage.origin;
             } else if (data.profileImageUrl) {
                 updateData.profileImageUrl = data.profileImageUrl;
+            }
+
+            // portraitImage → portraitImageUrl (オブジェクト → URL文字列)
+            // 2026年6月〜 キャラプの2:3縦長サムネイル仕様変更に対応
+            if (data.portraitImage && data.portraitImage.origin) {
+                updateData.portraitImageUrl = data.portraitImage.origin;
+            } else if (data.portraitImageUrl) {
+                updateData.portraitImageUrl = data.portraitImageUrl;
             }
 
             // promptTemplate → 文字列に変換
