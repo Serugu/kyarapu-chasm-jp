@@ -312,7 +312,7 @@
                 openrouterAPIKey: "",
                 apiProvider: "gemini",
                 geminiModel: "gemini-2.5-flash",
-                openrouterModel: "google/gemini-pro-1.5",
+                openrouterModel: "google/gemini-3.5-flash",
                 customGeminiModel: "",
                 messageLimit: 100,
                 userMessage: "**OOC: これまでのロールプレイングの進行状況を要約して。**",
@@ -702,7 +702,7 @@
                             <div class="prompt-area" style="margin-top: 10px;">
                                 ${promptsData.map(p => `<textarea id="prompt-${p.id}" class="prompt-text modal-input" rows="8" style="display: ${p.id === 'p1' ? 'block' : 'none'};">${p.text.replace(/{...}/, "ここにプロンプトを入力...")}</textarea>`).join('')}
                             </div>
-                            <div class="setting-item" style="margin-top: 10px;"><label for="burner-gemini-model-select">Geminiモデル選択</label><select id="burner-gemini-model-select" class="modal-input"><option value="gemini-3-flash-preview">Gemini 3.0 Flash Preview</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option><option value="gemini-2.5-flash">Gemini 2.5 Flash</option><option value="gemini-2.5-pro">Gemini 2.5 Pro</option><option value="direct-input">直接入力</option></select></div>
+                            <div class="setting-item" style="margin-top: 10px;"><label for="burner-gemini-model-select">Geminiモデル選択</label><select id="burner-gemini-model-select" class="modal-input"><option value="gemini-3.5-flash">Gemini 3.5 Flash</option><option value="gemini-3-flash-preview">Gemini 3.0 Flash Preview</option><option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option><option value="gemini-2.5-flash">Gemini 2.5 Flash</option><option value="gemini-2.5-pro">Gemini 2.5 Pro</option><option value="direct-input">直接入力</option></select></div>
                             <div id="custom-gemini-model-div" class="setting-item" style="display: none; margin-top: 10px;"><label for="burner-custom-gemini-model">カスタムGeminiモデル名</label><input type="text" id="burner-custom-gemini-model" class="modal-input"></div>
                             <button id="execute-btn" class="modal-button-primary" style="margin-top: 15px;">要約開始</button>
                         </div>
