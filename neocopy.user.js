@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.3
+// @version     KYARAPU-NCPY-v1.2.4
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/*
@@ -10,7 +10,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.3";
+const VERSION = "KYARAPU-NCPY-v1.2.4";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -360,6 +360,7 @@ GM_addStyle(`
             // APIが期待する形式に変換
             const updateData = {
                 name: data.name || "",
+                simpleDescription: data.simpleDescription || "",
                 description: data.description || "",
                 characterDetails: data.characterDetails || "",
                 customPrompt: data.customPrompt || "",
@@ -369,6 +370,7 @@ GM_addStyle(`
                 situationImages: data.situationImages || [],
                 startingSets: data.startingSets || [],
                 keywordBook: data.keywordBook || [],
+                shortcutCommands: data.shortcutCommands || [],
                 isCommentBlocked: data.isCommentBlocked || false,
             };
 
@@ -417,6 +419,20 @@ GM_addStyle(`
                     delete newSet._id;
                     return newSet;
                 });
+            }
+
+            // 作成者ショートカットをAPIが期待する形式に変換
+            // UI内部用のIDや折りたたみ状態は送信しない
+            if (Array.isArray(updateData.shortcutCommands)) {
+                updateData.shortcutCommands = updateData.shortcutCommands
+                    .map(command => ({
+                        ...(command.shortcutId && { shortcutId: command.shortcutId }),
+                        ...(command.createdAt && { createdAt: command.createdAt }),
+                        name: command.name || "",
+                        description: command.description || "",
+                        prompt: command.prompt || ""
+                    }))
+                    .filter(command => command.name.trim().length > 0 || command.prompt.trim().length > 0);
             }
 
             // situationImagesの処理（blurImageUrl等を削除）
@@ -572,9 +588,11 @@ GM_addStyle(`
 
         // データの健全性チェック（重要なフィールドが欠けていないか）
         const missingFields = [];
+        if (pasteData.simpleDescription === undefined) missingFields.push("キャラ紹介文");
         if (pasteData.description === undefined) missingFields.push("説明");
         if (pasteData.characterDetails === undefined) missingFields.push("詳細設定");
         if (pasteData.customPrompt === undefined) missingFields.push("カスタムプロンプト");
+        if (pasteData.shortcutCommands === undefined) missingFields.push("作成者ショートカット");
 
         if (missingFields.length > 0) {
             if (!confirm(`⚠️ 警告: 以下のデータが含まれていません。\n[ ${missingFields.join(", ")} ]\n\n貼り付けると、現在のデータが空白で上書きされ、消去されます。\n本当に続行しますか？`)) {
