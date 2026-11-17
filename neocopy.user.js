@@ -249,12 +249,6 @@ GM_addStyle(`
 
         if (!response.ok) {
             const errorText = await response.text();
-            
-            // 下書き保存の上限エラー判定
-            if (response.status === 400 && /limit|exceed|too many|上限/i.test(errorText)) {
-                throw new Error(`下書き保存の上限に達しました。不要な下書きを削除してください。\n(サーバーからの応答: ${errorText})`);
-            }
-            
             throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
@@ -352,126 +346,140 @@ GM_addStyle(`
     }
 
     /**
+     * APIが期待する形式の送信データを構築（貼り付け・公開設定変更で共用）
+     */
+    function buildUpdateData(data) {
+        const updateData = {
+            name: data.name || "",
+            simpleDescription: data.simpleDescription || "",
+            // 新APIの対応: detailDescription=画面の「説明」、storyDetails=画面の「詳細設定」
+            // 旧データ（description / characterDetails）でも新データでも合うよう相互に補う
+            description: data.description ?? data.detailDescription ?? "",
+            detailDescription: data.detailDescription ?? data.description ?? "",
+            storyDetails: data.storyDetails ?? data.characterDetails ?? "",
+            customPrompt: data.customPrompt || "",
+            visibility: data.visibility || "private",
+            tags: data.tags || [],
+            chatExamples: data.chatExamples || [],
+            situationImages: data.situationImages || [],
+            startingSets: data.startingSets || [],
+            keywordBook: data.keywordBook || [],
+            shortcutCommands: data.shortcutCommands || [],
+            isCommentBlocked: data.isCommentBlocked || false,
+            situationImageVersion: "v1",
+        };
+
+        // chatType（サイトの保存時に含まれている項目。データにある場合のみ引き継ぐ）
+        if (data.chatType !== undefined) {
+            updateData.chatType = data.chatType;
+        }
+
+        // 安心フィルター設定（isAdult）
+        if (typeof data.isAdult === 'boolean') {
+            updateData.isAdult = data.isAdult;
+        }
+
+        // categories → categoryIds (オブジェクト配列 → ID配列)
+        if (data.categories && Array.isArray(data.categories)) {
+            updateData.categoryIds = data.categories.map(cat => cat._id);
+        } else if (data.categoryIds) {
+            updateData.categoryIds = data.categoryIds;
+        } else {
+            updateData.categoryIds = [];
+        }
+
+        // genreId: categoryIds[0] がジャンルとは限らないため、無いときは補わず送らない
+        if (data.genreId) {
+            updateData.genreId = data.genreId;
+        }
+        if (data.target) {
+            updateData.target = data.target;
+        }
+
+        // profileImage → profileImageUrl (オブジェクト → URL文字列)
+        if (data.profileImage && data.profileImage.origin) {
+            updateData.profileImageUrl = data.profileImage.origin;
+        } else if (data.profileImageUrl) {
+            updateData.profileImageUrl = data.profileImageUrl;
+        }
+
+        // portraitImage → portraitImageUrl (オブジェクト → URL文字列)
+        // 2026年6月〜 キャラプの2:3縦長サムネイル仕様変更に対応
+        if (data.portraitImage && data.portraitImage.origin) {
+            updateData.portraitImageUrl = data.portraitImage.origin;
+        } else if (data.portraitImageUrl) {
+            updateData.portraitImageUrl = data.portraitImageUrl;
+        }
+
+        // promptTemplate → 文字列に変換
+        if (data.promptTemplate && typeof data.promptTemplate === 'object') {
+            updateData.promptTemplate = data.promptTemplate.template || "custom";
+        } else if (data.promptTemplate) {
+            updateData.promptTemplate = data.promptTemplate;
+        } else {
+            updateData.promptTemplate = "custom";
+        }
+
+        // situationImagesの処理（blurImageUrl等を削除）
+        if (updateData.situationImages && Array.isArray(updateData.situationImages)) {
+            updateData.situationImages = updateData.situationImages.map(img => ({
+                situation: img.situation || "",
+                keyword: img.keyword || "",
+                imageUrl: img.imageUrl || "",
+                isBlind: img.isBlind || false,
+                blurSigma: img.blurSigma || 70
+            }));
+        }
+
+        // startingSetsから_idを削除（新規作成されるため）
+        // サイトの保存形式に合わせ、全体の situationImages / keywordBook を各スタート設定にも入れる
+        if (updateData.startingSets && Array.isArray(updateData.startingSets)) {
+            updateData.startingSets = updateData.startingSets.map(set => {
+                const newSet = { ...set };
+                delete newSet._id;
+                newSet.situationImages = updateData.situationImages;
+                newSet.keywordBook = updateData.keywordBook;
+                return newSet;
+            });
+        }
+
+        // 作成者ショートカットをAPIが期待する形式に変換
+        // UI内部用のIDや折りたたみ状態は送信しない
+        if (Array.isArray(updateData.shortcutCommands)) {
+            updateData.shortcutCommands = updateData.shortcutCommands
+                .map(command => ({
+                    ...(command.shortcutId && { shortcutId: command.shortcutId }),
+                    ...(command.createdAt && { createdAt: command.createdAt }),
+                    name: command.name || "",
+                    description: command.description || "",
+                    prompt: command.prompt || ""
+                }))
+                .filter(command => command.name.trim().length > 0 || command.prompt.trim().length > 0);
+        }
+
+        console.log("送信するデータ:", updateData);
+        console.log("更新するフィールド:", Object.keys(updateData));
+        return updateData;
+    }
+
+    /**
      * キャラクターデータを更新（貼り付け用）
      * APIが期待する形式に変換して送信
-     * - 新規キャラ (type=create): POST /character-drafts で下書き保存
-     * - 既存キャラ (type=edit): PATCH /characters/{id} で更新
+     * - 新規キャラ (type=create): POST /kyarapu-api/story-drafts/v2 で下書き保存
+     * - 既存キャラ (type=edit): PATCH /kyarapu-api/stories/{id}/v2 で更新
      */
     async function updateCharacterData(characterId, data) {
         try {
             const isNew = isNewCharacter();
             log(`更新データを準備中... (${isNew ? '下書き保存モード' : '編集モード'})`);
 
-            // APIが期待する形式に変換
-            const updateData = {
-                name: data.name || "",
-                simpleDescription: data.simpleDescription || "",
-                description: data.description || "",
-                characterDetails: data.characterDetails || data.detailDescription || "",
-                // v2: 新APIの正式名 detailDescription でも同じ値を送る（旧名だけだと詳細設定が空で送られる恐れがあるため両方）
-                detailDescription: data.detailDescription || data.characterDetails || "",
-                storyDetails: data.storyDetails || "",
-                customPrompt: data.customPrompt || "",
-                visibility: data.visibility || "private",
-                tags: data.tags || [],
-                chatExamples: data.chatExamples || [],
-                situationImages: data.situationImages || [],
-                startingSets: data.startingSets || [],
-                keywordBook: data.keywordBook || [],
-                shortcutCommands: data.shortcutCommands || [],
-                isCommentBlocked: data.isCommentBlocked || false,
-            };
-
-            // 安心フィルター設定（isAdult）
-            if (typeof data.isAdult === 'boolean') {
-                updateData.isAdult = data.isAdult;
-            }
-
-            // categories → categoryIds (オブジェクト配列 → ID配列)
-            if (data.categories && Array.isArray(data.categories)) {
-                updateData.categoryIds = data.categories.map(cat => cat._id);
-            } else if (data.categoryIds) {
-                updateData.categoryIds = data.categoryIds;
-            } else {
-                updateData.categoryIds = [];
-            }
-
-            // v2: 新APIは genreId（単一）と target も返す。旧 categoryIds と両方送ってジャンル落ちを防ぐ
-            if (data.genreId) {
-                updateData.genreId = data.genreId;
-            } else if (updateData.categoryIds && updateData.categoryIds.length) {
-                updateData.genreId = updateData.categoryIds[0];
-            }
-            if (data.target) {
-                updateData.target = data.target;
-            }
-
-            // profileImage → profileImageUrl (オブジェクト → URL文字列)
-            if (data.profileImage && data.profileImage.origin) {
-                updateData.profileImageUrl = data.profileImage.origin;
-            } else if (data.profileImageUrl) {
-                updateData.profileImageUrl = data.profileImageUrl;
-            }
-
-            // portraitImage → portraitImageUrl (オブジェクト → URL文字列)
-            // 2026年6月〜 キャラプの2:3縦長サムネイル仕様変更に対応
-            if (data.portraitImage && data.portraitImage.origin) {
-                updateData.portraitImageUrl = data.portraitImage.origin;
-            } else if (data.portraitImageUrl) {
-                updateData.portraitImageUrl = data.portraitImageUrl;
-            }
-
-            // promptTemplate → 文字列に変換
-            if (data.promptTemplate && typeof data.promptTemplate === 'object') {
-                updateData.promptTemplate = data.promptTemplate.template || "custom";
-            } else if (data.promptTemplate) {
-                updateData.promptTemplate = data.promptTemplate;
-            } else {
-                updateData.promptTemplate = "custom";
-            }
-
-            // startingSetsから_idを削除（新規作成されるため）
-            if (updateData.startingSets && Array.isArray(updateData.startingSets)) {
-                updateData.startingSets = updateData.startingSets.map(set => {
-                    const newSet = { ...set };
-                    delete newSet._id;
-                    return newSet;
-                });
-            }
-
-            // 作成者ショートカットをAPIが期待する形式に変換
-            // UI内部用のIDや折りたたみ状態は送信しない
-            if (Array.isArray(updateData.shortcutCommands)) {
-                updateData.shortcutCommands = updateData.shortcutCommands
-                    .map(command => ({
-                        ...(command.shortcutId && { shortcutId: command.shortcutId }),
-                        ...(command.createdAt && { createdAt: command.createdAt }),
-                        name: command.name || "",
-                        description: command.description || "",
-                        prompt: command.prompt || ""
-                    }))
-                    .filter(command => command.name.trim().length > 0 || command.prompt.trim().length > 0);
-            }
-
-            // situationImagesの処理（blurImageUrl等を削除）
-            if (updateData.situationImages && Array.isArray(updateData.situationImages)) {
-                updateData.situationImages = updateData.situationImages.map(img => ({
-                    situation: img.situation || "",
-                    keyword: img.keyword || "",
-                    imageUrl: img.imageUrl || "",
-                    isBlind: img.isBlind || false,
-                    blurSigma: img.blurSigma || 70
-                }));
-            }
-
-            console.log("送信するデータ:", updateData);
-            console.log("更新するフィールド:", Object.keys(updateData));
+            const updateData = buildUpdateData(data);
 
             let url, method, response;
 
             if (isNew) {
-                // 新規キャラクターの場合: POST /character-drafts で下書き保存
-                url = `${API_BASE_URL}/kyarapu-api/story-drafts`; // fix20261117: 推定パス（未検証）
+                // 新規キャラクターの場合: POST /story-drafts/v2 で下書き保存
+                url = `${API_BASE_URL}/kyarapu-api/story-drafts/v2`; 
                 method = 'POST';
                 
                 // 下書き保存用のデータ形式（characterIdを追加）
@@ -489,8 +497,8 @@ GM_addStyle(`
                     log(`下書き保存成功: characterDraftId=${response.data.characterDraftId}`);
                 }
             } else {
-                // 既存キャラクターの場合: PATCH /characters/{id} で更新
-                url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}`; // fix20261117: 推定パス（未検証）
+                // 既存キャラクターの場合: PATCH /stories/{id}/v2 で更新
+                url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}/v2`; 
                 method = 'PATCH';
                 log(`キャラ更新: PATCH ${url}`);
                 response = await authFetch(method, url, updateData);
@@ -508,8 +516,18 @@ GM_addStyle(`
      */
     async function updateVisibility(characterId, visibility) {
         try {
-            const url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}`; // fix20261117: 推定パス（未検証）
-            const response = await authFetch('PATCH', url, { visibility: visibility });
+            // v2では公開設定だけを送ると400になるため、全項目に公開設定を載せて送信する
+            let data = getCharacterDataFromPage();
+            if (!data) {
+                data = await fetchCharacterData(characterId);
+            }
+            if (!data) {
+                throw new Error("キャラクターデータが取得できませんでした");
+            }
+            const payload = buildUpdateData(data);
+            payload.visibility = visibility;
+            const url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}/v2`;
+            const response = await authFetch('PATCH', url, payload);
             return response;
         } catch (error) {
             logError(`公開設定の変更に失敗: ${error.message}`);
@@ -609,7 +627,7 @@ GM_addStyle(`
         const missingFields = [];
         if (pasteData.simpleDescription === undefined) missingFields.push("キャラ紹介文");
         if (pasteData.description === undefined) missingFields.push("説明");
-        if (pasteData.characterDetails === undefined && pasteData.detailDescription === undefined) missingFields.push("詳細設定");
+        if (pasteData.characterDetails === undefined && pasteData.storyDetails === undefined) missingFields.push("詳細設定");
         if (pasteData.customPrompt === undefined) missingFields.push("カスタムプロンプト");
         if (pasteData.shortcutCommands === undefined) missingFields.push("作成者ショートカット");
 
