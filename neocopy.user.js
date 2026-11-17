@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.5
+// @version     KYARAPU-NCPY-v1.2.6
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/*
@@ -10,7 +10,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.5";
+const VERSION = "KYARAPU-NCPY-v1.2.6";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -420,15 +420,19 @@ GM_addStyle(`
             updateData.promptTemplate = "custom";
         }
 
-        // situationImagesの処理（blurImageUrl等を削除）
+        // situationImagesの処理（UI用の項目を削除。ぼかし画像はサイトと同じく、あれば送る）
         if (updateData.situationImages && Array.isArray(updateData.situationImages)) {
-            updateData.situationImages = updateData.situationImages.map(img => ({
-                situation: img.situation || "",
-                keyword: img.keyword || "",
-                imageUrl: img.imageUrl || "",
-                isBlind: img.isBlind || false,
-                blurSigma: img.blurSigma || 70
-            }));
+            updateData.situationImages = updateData.situationImages.map(img => {
+                const blurredImageUrl = img.blurredImageUrl || img.blurImageUrl;
+                return {
+                    situation: img.situation || "",
+                    keyword: img.keyword || "",
+                    imageUrl: img.imageUrl || "",
+                    isBlind: img.isBlind || false,
+                    blurSigma: img.blurSigma || 70,
+                    ...(blurredImageUrl && { blurredImageUrl })
+                };
+            });
         }
 
         // startingSetsから_idを削除（新規作成されるため）
@@ -494,7 +498,7 @@ GM_addStyle(`
                 response = await authFetch(method, url, draftData);
                 
                 if (response && response.data) {
-                    log(`下書き保存成功: characterDraftId=${response.data.characterDraftId}`);
+                    log(`下書き保存成功: storyDraftId=${response.data.storyDraftId ?? response.data.characterDraftId}`);
                 }
             } else {
                 // 既存キャラクターの場合: PATCH /stories/{id}/v2 で更新
