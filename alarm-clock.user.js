@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Crystallized AlarmClock
 // @namespace   https://github.com/Serugu/kyarapu-chasm-jp
-// @version     KYR-ALRM-v1.0.0
+// @version     KYR-ALRM-v1.1.0
 // @description 毎日の出席通知と即時出席ボタンを追加します。
 // @author      milkyway0308 (Original), Serugu (JP Port)
 // @match       https://kyarapu.com/*
@@ -308,11 +308,11 @@ GM_addStyle(`
     async function canAttend() {
         const webResult = await authFetch(
             "GET",
-            "https://api.kyarapu.com/kyarapu-gold/events/check-in"
+            "https://api.kyarapu.com/kyarapu-cash/attendance"
         );
         if (webResult instanceof Error) return webResult;
 
-        if (webResult.data && webResult.data.active === true) {
+        if (webResult.data && webResult.data.attendanceStatus === "NOT_ATTENDED") {
             return true;
         }
         return false;
@@ -366,7 +366,7 @@ GM_addStyle(`
     async function performAttend() {
         const result = await authFetch(
             "POST",
-            "https://api.kyarapu.com/kyarapu-gold/events/check-in"
+            "https://api.kyarapu.com/kyarapu-cash/attendance"
         );
         if (result instanceof Error) {
             return false;

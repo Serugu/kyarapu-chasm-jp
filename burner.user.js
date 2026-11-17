@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyarapu Chasm burner
 // @namespace    https://github.com/chasm-js
-// @version      KYARA-BURN-v2.1.7
+// @version      KYARA-BURN-v2.2.0
 // @description  最初に日本語版を作ってくれたsuccii(Dr.MJ)に感謝。最新版がバグで動作しなかったため、独自に修正・改善を行ったバージョンです。
 // @author       chasm-js, milkyway0308, succii(Dr.MJ), Serugu
 // @match        https://kyarapu.com/u/*
@@ -20,6 +20,9 @@
 
     // --- 設定及び定数 ---
     const API_BASE_URL = "https://api.kyarapu.com";
+    const PROFILE_API = `${API_BASE_URL}/kyarapu-api`;
+    const CHAT_API = `${API_BASE_URL}/kyarapu-gen/v3/chats`;
+    const MESSAGE_PAGE_SIZE = 20;
     const CHUNK_SIZE = 4999;
     let timerInterval = null;
     let resultCounter = 0;
@@ -55,6 +58,12 @@
 
     // --- エラーハンドラ ---
     function handleError(error, context = "不明なエラー", request = null, response = null) {
+        // gmFetch の失敗は {error, response, request} の形で届くので、中身を取り出す
+        if (error && !(error instanceof Error) && typeof error === "object") {
+            request = request ?? error.request ?? null;
+            response = response ?? error.response ?? null;
+            error = error.error ?? new Error(JSON.stringify(error));
+        }
         console.error(`[Chasm Burner Error] Context: ${context}`, error);
         const errorDetails = [
             `コンテキスト: ${context}`,
@@ -85,14 +94,15 @@
                         }
                     } else {
                         reject({
-                            error: new Error(`HTTP ${res.status}: ${res.statusText}`),
+                            error: new Error(`HTTP ${res.status}: ${res.statusText} (${options.method} ${options.url.split('?')[0]})`),
                             response: res.responseText,
                             request: options.body
                         });
                     }
                 },
                 onerror: err => reject({
-                    error: err
+                    error: new Error(`ネットワークエラー (${options.method} ${options.url.split('?')[0]})`),
+                    response: err?.statusText || null
                 })
             });
         });
@@ -101,21 +111,35 @@
     // --- API通信クラス ---
     class KyarapuAPI {
 
+        // 新しい順（desc）で最大 limit 件のメッセージを取得する
         async getMessages(roomId, cursor = "", limit = 100) {
-            const url = `${API_BASE_URL}/kyarapu-chat/chats/${roomId}/messages?limit=${limit}&platform=web${cursor ? '&cursorId=' + cursor : ''}`;
             const headers = {
-                Authorization: `Bearer ${getCookie("access_token")}`,
-                "Content-Type": "application/json"
+                Authorization: `Bearer ${getCookie("access_token")}`
             };
+            const messages = [];
+            let nextCursor = cursor || null;
             try {
-                return await gmFetch({
-                    method: 'GET',
-                    url,
-                    headers
-                });
+                do {
+                    const pageSize = Math.min(MESSAGE_PAGE_SIZE, limit - messages.length);
+                    const url = `${CHAT_API}/${roomId}/messages?limit=${pageSize}&sortOrder=desc${nextCursor ? '&cursor=' + encodeURIComponent(nextCursor) : ''}`;
+                    const res = await gmFetch({
+                        method: 'GET',
+                        url,
+                        headers
+                    });
+                    const page = res?.data?.messages || [];
+                    messages.push(...page);
+                    nextCursor = (res?.data?.hasNext !== false && page.length > 0) ? res?.data?.nextCursor : null;
+                } while (nextCursor && messages.length < limit);
             } catch (error) {
-                throw new Error(error?.responseText || 'メッセージ読み込み中に不明なネットワークエラーが発生しました');
+                const e = error?.error || error;
+                throw new Error(`メッセージ読み込みに失敗しました: ${e?.message || e}${error?.response ? ' / ' + String(error.response).slice(0, 300) : ''}`);
             }
+            return {
+                data: {
+                    messages: messages.slice(0, limit)
+                }
+            };
         }
 
         constructor() {
@@ -137,7 +161,7 @@
                 // 1. '/me' 엔드포인트에 요청을 보내 사용자 정보를 받습니다.
                 const response = await gmFetch({
                     method: 'GET',
-                    url: 'https://api.kyarapu.com/kyarapu/profiles/me',
+                    url: `${PROFILE_API}/profiles`,
                     headers: {
                         Authorization: `Bearer ${getCookie("access_token")}`
                     }
@@ -162,7 +186,7 @@
             if (!userId)
                 return []; // ID가 없으면 빈 배열 반환
 
-            const url = `${API_BASE_URL}/kyarapu/profiles/${userId}/character-chat-profiles`;
+            const url = `${PROFILE_API}/profiles/${userId}/chat-profiles`;
             const headers = {
                 Authorization: `Bearer ${getCookie("access_token")}`
             };
@@ -172,7 +196,7 @@
                     url,
                     headers
                 });
-                return response.data.characterChatProfiles;
+                return response.data.chatProfiles;
             } catch (error) {
                 handleError(error, "プロフィールリストの読み込み失敗");
             }
@@ -183,7 +207,7 @@
             if (!userId)
                 return;
 
-            const url = `${API_BASE_URL}/kyarapu/profiles/${userId}/character-chat-profiles/${personaId}`;
+            const url = `${PROFILE_API}/profiles/${userId}/chat-profiles/${personaId}`;
             const headers = {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie("access_token")}`
@@ -208,7 +232,7 @@
             if (!userId)
                 return;
 
-            const url = `${API_BASE_URL}/kyarapu/profiles/${userId}/character-chat-profiles/${personaId}`;
+            const url = `${PROFILE_API}/profiles/${userId}/chat-profiles/${personaId}`;
             const method = 'PATCH';
             const headers = {
                 'Content-Type': 'application/json',
@@ -231,31 +255,54 @@
         }
     }
 
-    // --- ストリーム消費関数 ---
-    async function consumeKyarapuStream(chatroomId, messageId) {
-        const streamUrl = `${API_BASE_URL}/kyarapu-chat/chats/${chatroomId}/messages/${messageId}`;
-        try {
-            const response = await fetch(streamUrl, {
-                method: 'GET',
-                credentials: 'include',
-                headers: {
-                    'Authorization': `Bearer ${getCookie("access_token")}`
-                }
-            });
-            if (!response.ok)
-                throw new Error(`ストリームGETリクエストに失敗しました: ${response.status}`);
-            const reader = response.body.getReader();
-            while (true) {
-                const {
-                    done
-                } = await reader.read();
-                if (done)
-                    break;
+    // --- チャット入力欄からの送信 ---
+    // キャラぷのメッセージ送信は socket.io 経由になったため、ページの入力欄に書いて送信ボタンを押す。
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function getLatestMessage(chatroomId) {
+        const res = await new KyarapuAPI().getMessages(chatroomId, "", 1);
+        return res.data.messages[0] || null;
+    }
+
+    async function sendViaChatInput(text) {
+        const editor = document.querySelector('.tiptap.ProseMirror[contenteditable="true"]');
+        if (!editor)
+            throw new Error("チャット入力欄が見つかりません。");
+        const sendBtn = document.querySelector('button[data-tour="autoplay"]');
+        if (!sendBtn)
+            throw new Error("送信ボタンが見つかりません。");
+        if (editor.textContent.trim() !== '')
+            throw new Error("チャット入力欄に書きかけの文があります。空にしてからもう一度送信してください。");
+        editor.focus();
+        document.execCommand('insertText', false, text);
+        await sleep(300);
+        if (editor.textContent.trim() !== text.trim())
+            throw new Error("チャット入力欄への書き込みに失敗しました。");
+        // 入力欄が空のときこのボタンはオートプレイになるため、書き込みを確かめてから押す
+        sendBtn.click();
+    }
+
+    async function waitForNewAssistantMessage(chatroomId, previousId, timeoutMs = 300000) {
+        const deadline = Date.now() + timeoutMs;
+        let lastContent = null;
+        let stableCount = 0;
+        while (Date.now() < deadline) {
+            await sleep(2000);
+            const latest = await getLatestMessage(chatroomId);
+            if (!latest || latest._id === previousId || latest.role !== 'assistant') {
+                lastContent = null;
+                stableCount = 0;
+                continue;
             }
-        } catch (error) {
-            console.error("[ストリーム消費中にエラー発生]", error);
-            throw error;
+            if (latest.content && latest.content === lastContent) {
+                if (++stableCount >= 2)
+                    return latest;
+            } else {
+                lastContent = latest.content;
+                stableCount = 0;
+            }
         }
+        throw new Error("キャラクターの応答を待つ間にタイムアウトしました。");
     }
 
     // --- 要約転送ロジック ---
@@ -271,36 +318,27 @@
         }, (_, i) => summaryMessage.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
         for (const [index, chunk] of chunks.entries()) {
             const initialMessage = (index === 0 && triggerMessage.trim() !== '') ? triggerMessage : ".";
-            const body = JSON.stringify({
-                message: initialMessage,
-                chatType: 'powerchat'
-            });
-            const sendResponse = await gmFetch({
-                method: 'POST',
-                url: `${API_BASE_URL}/kyarapu-chat/chats/${chatroomInfo.chatroomId}/messages?platform=web`,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getCookie("access_token")}`
-                },
-                body: body
-            });
-            const messageId = sendResponse.data;
-            if (!messageId)
-                throw new Error("一時的なメッセージIDの受信に失敗しました。");
-            await consumeKyarapuStream(chatroomInfo.chatroomId, messageId);
-            await gmFetch({
-                method: 'PATCH',
-                url: `${API_BASE_URL}/kyarapu-chat/chats/${chatroomInfo.chatroomId}/messages/${messageId}`,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getCookie("access_token")}`
-                },
-                body: JSON.stringify({
-                    message: chunk
-                })
-            });
+            const before = await getLatestMessage(chatroomInfo.chatroomId);
+            await sendViaChatInput(initialMessage);
+            const reply = await waitForNewAssistantMessage(chatroomInfo.chatroomId, before?._id);
+            try {
+                await gmFetch({
+                    method: 'PATCH',
+                    url: `${CHAT_API}/${chatroomInfo.chatroomId}/messages/${reply._id}`,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getCookie("access_token")}`
+                    },
+                    body: JSON.stringify({
+                        message: chunk
+                    })
+                });
+            } catch (error) {
+                const e = error?.error || error;
+                throw new Error(`応答の書き換えに失敗しました: ${e?.message || e}${error?.response ? ' / ' + String(error.response).slice(0, 300) : ''}`);
+            }
             if (index < chunks.length - 1)
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await sleep(1500);
         }
     }
 

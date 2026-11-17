@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Crystallized Counter
 // @namespace   https://github.com/Serugu/kyarapu-chasm-jp
-// @version     KYARAPU-CNTR-JP-v1.3.1
+// @version     KYARAPU-CNTR-JP-v1.4.0
 // @description キャラプのチャットにターンカウンターを追加します。韓国版Crystallized Chasmの日本版移植です。
 // @author      milkyway0308 (Original), Serugu (JP Port)
 // @match       https://kyarapu.com/*
@@ -364,22 +364,22 @@
 
   /**
    * キャラプ日本版API用のメッセージカウント取得
-   * エンドポイント: /kyarapu-chat/chats/{chatId}/messages
-   * レスポンス構造: data.list (韓国版は data.messages)
+   * エンドポイント: /kyarapu-gen/v3/chats/{chatId}/messages（新しい順）
+   * レスポンス構造: data.messages, data.hasNext, data.nextCursor
    */
   async function fetchMessageCount(chatId, liveReceiver) {
     await setLastAccess(chatId);
     let chatCounts = await getMessageCount(chatId);
     let changed = false;
-    let url = `${API_BASE_URL}/kyarapu-chat/chats/${chatId}/messages?limit=20`;
+    const baseUrl = `${API_BASE_URL}/kyarapu-gen/v3/chats/${chatId}/messages?limit=20&sortOrder=desc`;
+    let url = baseUrl;
     let continueFetch = true;
     while (continueFetch) {
       const result = await retryAuthFetch(3, "GET", url);
       if (!result || result instanceof Error) {
         throw result ?? new Error("Unknown error from request");
       }
-      // 日本版は data.list を使用
-      const dataMessages = result.data.list || result.data.messages || [];
+      const dataMessages = result.data.messages || result.data.list || [];
       for (let message of dataMessages) {
         const messageId = message._id;
         if (message.role === "user") continue;
@@ -396,8 +396,8 @@
         }
       }
       // ページネーション: nextCursor を使用
-      if (result.data.nextCursor) {
-        url = `${API_BASE_URL}/kyarapu-chat/chats/${chatId}/messages?limit=20&cursorId=${result.data.nextCursor}`;
+      if (continueFetch && result.data.hasNext !== false && result.data.nextCursor) {
+        url = `${baseUrl}&cursor=${encodeURIComponent(result.data.nextCursor)}`;
         // Waiting 50ms to avoid ratelimiting
         await new Promise((resolve) => setTimeout(resolve, 50));
       } else {
