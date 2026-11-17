@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.4
+// @version     KYARAPU-NCPY-v1.2.5
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/*
@@ -10,7 +10,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.4";
+const VERSION = "KYARAPU-NCPY-v1.2.5";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -251,7 +251,7 @@ GM_addStyle(`
             const errorText = await response.text();
             
             // 下書き保存の上限エラー判定
-            if (response.status === 400 && errorText.includes("draft")) {
+            if (response.status === 400 && /limit|exceed|too many|上限/i.test(errorText)) {
                 throw new Error(`下書き保存の上限に達しました。不要な下書きを削除してください。\n(サーバーからの応答: ${errorText})`);
             }
             
@@ -295,7 +295,11 @@ GM_addStyle(`
 
         // initialSavedDataを最優先で確認（編集ページで最も信頼できる）
         if (nextData.props?.pageProps?.initialSavedData) {
-            const data = nextData.props.pageProps.initialSavedData;
+            let data = nextData.props.pageProps.initialSavedData;
+            // v2: 新API包み {result, data} の場合も開く
+            if (data && data.data && typeof data.data === 'object' && data.data.name) {
+                data = data.data;
+            }
             log(`initialSavedDataから取得: ${data.name || '名前不明'}`);
             console.log("Character data structure:", Object.keys(data));
             return data;
@@ -306,9 +310,10 @@ GM_addStyle(`
         if (fallback) {
             console.log("fallback keys:", Object.keys(fallback));
             
-            // /characters/me/{id} キーを探す
+            // /stories/me/{id} 等のキーを探す（2026-11 API変更対応: characters→stories）
+            const currentId = getCharacterIdFromUrl();
             for (const key of Object.keys(fallback)) {
-                if (key.startsWith('/characters/me/')) {
+                if (key.includes('/stories/me/') || key.startsWith('/characters/me/') || (currentId && key.includes(currentId))) {
                     const data = fallback[key];
                     log(`fallback[${key}]から取得: ${data?.name || '名前不明'}`);
                     console.log("Character data structure:", Object.keys(data || {}));
@@ -330,7 +335,7 @@ GM_addStyle(`
      */
     async function fetchCharacterData(characterId) {
         try {
-            const url = `${API_BASE_URL}/kyarapu/characters/me/${characterId}`;
+            const url = `${API_BASE_URL}/kyarapu-api/stories/me/${characterId}`;
             log(`APIからデータ取得中: ${url}`);
             const response = await authFetch('GET', url);
             console.log("API response structure:", Object.keys(response || {}));
@@ -362,7 +367,10 @@ GM_addStyle(`
                 name: data.name || "",
                 simpleDescription: data.simpleDescription || "",
                 description: data.description || "",
-                characterDetails: data.characterDetails || "",
+                characterDetails: data.characterDetails || data.detailDescription || "",
+                // v2: 新APIの正式名 detailDescription でも同じ値を送る（旧名だけだと詳細設定が空で送られる恐れがあるため両方）
+                detailDescription: data.detailDescription || data.characterDetails || "",
+                storyDetails: data.storyDetails || "",
                 customPrompt: data.customPrompt || "",
                 visibility: data.visibility || "private",
                 tags: data.tags || [],
@@ -386,6 +394,16 @@ GM_addStyle(`
                 updateData.categoryIds = data.categoryIds;
             } else {
                 updateData.categoryIds = [];
+            }
+
+            // v2: 新APIは genreId（単一）と target も返す。旧 categoryIds と両方送ってジャンル落ちを防ぐ
+            if (data.genreId) {
+                updateData.genreId = data.genreId;
+            } else if (updateData.categoryIds && updateData.categoryIds.length) {
+                updateData.genreId = updateData.categoryIds[0];
+            }
+            if (data.target) {
+                updateData.target = data.target;
             }
 
             // profileImage → profileImageUrl (オブジェクト → URL文字列)
@@ -453,11 +471,12 @@ GM_addStyle(`
 
             if (isNew) {
                 // 新規キャラクターの場合: POST /character-drafts で下書き保存
-                url = `${API_BASE_URL}/kyarapu/character-drafts`;
+                url = `${API_BASE_URL}/kyarapu-api/story-drafts`; // fix20261117: 推定パス（未検証）
                 method = 'POST';
                 
                 // 下書き保存用のデータ形式（characterIdを追加）
                 const draftData = {
+                    storyId: characterId,
                     characterId: characterId,
                     ...updateData
                 };
@@ -471,7 +490,7 @@ GM_addStyle(`
                 }
             } else {
                 // 既存キャラクターの場合: PATCH /characters/{id} で更新
-                url = `${API_BASE_URL}/kyarapu/characters/${characterId}`;
+                url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}`; // fix20261117: 推定パス（未検証）
                 method = 'PATCH';
                 log(`キャラ更新: PATCH ${url}`);
                 response = await authFetch(method, url, updateData);
@@ -489,7 +508,7 @@ GM_addStyle(`
      */
     async function updateVisibility(characterId, visibility) {
         try {
-            const url = `${API_BASE_URL}/kyarapu/characters/${characterId}`;
+            const url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}`; // fix20261117: 推定パス（未検証）
             const response = await authFetch('PATCH', url, { visibility: visibility });
             return response;
         } catch (error) {
@@ -590,7 +609,7 @@ GM_addStyle(`
         const missingFields = [];
         if (pasteData.simpleDescription === undefined) missingFields.push("キャラ紹介文");
         if (pasteData.description === undefined) missingFields.push("説明");
-        if (pasteData.characterDetails === undefined) missingFields.push("詳細設定");
+        if (pasteData.characterDetails === undefined && pasteData.detailDescription === undefined) missingFields.push("詳細設定");
         if (pasteData.customPrompt === undefined) missingFields.push("カスタムプロンプト");
         if (pasteData.shortcutCommands === undefined) missingFields.push("作成者ショートカット");
 
