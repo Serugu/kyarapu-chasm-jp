@@ -371,19 +371,17 @@ GM_addStyle(`
 
         // chatType: サイトは "simulation" / "rolePlaying" のような文字列で送る（実リクエストで確認済み）
         const CHAT_TYPE_BY_NAME = { "シミュレーション": "simulation", "1:1ロールプレイ": "rolePlaying" };
-        if (data.chatType !== undefined) {
-            updateData.chatType = data.chatType;
-        } else if (typeof data.chatType === 'string' && data.chatType) {
+        // タイプ系カテゴリのID（サイトは表示名ではなくカテゴリIDでタイプを決めている）
+        const CHAT_TYPE_BY_CATEGORY_ID = { "68177812f3d86d73fa1218c6": "simulation", "68177829f3d86d73fa1218c8": "rolePlaying" };
+        if (typeof data.chatType === 'string' && data.chatType) {
             updateData.chatType = data.chatType;
         } else if (data.chatType && typeof data.chatType === 'object' && CHAT_TYPE_BY_NAME[data.chatType.name]) {
             updateData.chatType = CHAT_TYPE_BY_NAME[data.chatType.name];
-        } else if (Array.isArray(data.categories))  {
-            // chatTypeが無いデータではカテゴリから推定する（ジャンルとターゲットを除いた残りがタイプ系　最新のAPIではcategories[2]に入っている）
-            const genreId = data.genreId || (data.genre && data.genre._id);
-            const typeCat = data.categories.find(cat =>
-                cat && cat._id !== genreId && cat.name !== "男性向け" && cat.name !== "女性向け" && CHAT_TYPE_BY_NAME[cat.name]);
+        } else if (Array.isArray(data.categories)) {
+            // chatTypeが無いデータでは、カテゴリIDからタイプを判定する
+            const typeCat = data.categories.find(cat => cat && CHAT_TYPE_BY_CATEGORY_ID[cat._id]);
             if (typeCat) {
-                updateData.chatType = CHAT_TYPE_BY_NAME[typeCat.name];
+                updateData.chatType = CHAT_TYPE_BY_CATEGORY_ID[typeCat._id];
             }
         }
 
@@ -496,7 +494,7 @@ GM_addStyle(`
 
             // 別のキャラのデータを貼る場合、スタート設定の baseSetId がコピー元のままだと
             // サーバーが「すでに使用中の初期設定です」と返すため取り除く（同じキャラの再公開では保持する）
-            if (data._id && data._id !== characterId && Array.isArray(updateData.startingSets)) {
+            if (data._id !== characterId && Array.isArray(updateData.startingSets)) {
                 updateData.startingSets = updateData.startingSets.map(set => {
                     const newSet = { ...set };
                     delete newSet.baseSetId;
@@ -523,7 +521,7 @@ GM_addStyle(`
                 response = await authFetch(method, url, draftData);
 
                 if (response && response.data) {
-                    log(`下書き保存成功: characterDraftId=${response.data.characterDraftId}`);
+                    log(`下書き保存成功: storyDraftId=${response.data.storyDraftId ?? response.data.characterDraftId}`);
                 }
             } else {
                 // 既存キャラクターの場合: PATCH /stories/{id}/v2 で更新
