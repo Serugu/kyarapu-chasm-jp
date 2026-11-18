@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.6
+// @version     KYARAPU-NCPY-v1.2.7
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/*
@@ -10,7 +10,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.6";
+const VERSION = "KYARAPU-NCPY-v1.2.7";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -303,7 +303,7 @@ GM_addStyle(`
         const fallback = nextData.props?.pageProps?.fallback;
         if (fallback) {
             console.log("fallback keys:", Object.keys(fallback));
-            
+
             // /stories/me/{id} 等のキーを探す（2026-11 API変更対応: characters→stories）
             const currentId = getCharacterIdFromUrl();
             for (const key of Object.keys(fallback)) {
@@ -333,7 +333,7 @@ GM_addStyle(`
             log(`APIからデータ取得中: ${url}`);
             const response = await authFetch('GET', url);
             console.log("API response structure:", Object.keys(response || {}));
-            
+
             // レスポンスがラップされている場合
             if (response && response.data && typeof response.data === 'object' && response.data.name) {
                 return response.data;
@@ -369,9 +369,22 @@ GM_addStyle(`
             situationImageVersion: "v1",
         };
 
-        // chatType（サイトの保存時に含まれている項目。データにある場合のみ引き継ぐ）
+        // chatType: サイトは "simulation" / "rolePlaying" のような文字列で送る（実リクエストで確認済み）
+        const CHAT_TYPE_BY_NAME = { "シミュレーション": "simulation", "1:1ロールプレイ": "rolePlaying" };
         if (data.chatType !== undefined) {
             updateData.chatType = data.chatType;
+        } else if (typeof data.chatType === 'string' && data.chatType) {
+            updateData.chatType = data.chatType;
+        } else if (data.chatType && typeof data.chatType === 'object' && CHAT_TYPE_BY_NAME[data.chatType.name]) {
+            updateData.chatType = CHAT_TYPE_BY_NAME[data.chatType.name];
+        } else if (Array.isArray(data.categories))  {
+            // chatTypeが無いデータではカテゴリから推定する（ジャンルとターゲットを除いた残りがタイプ系　最新のAPIではcategories[2]に入っている）
+            const genreId = data.genreId || (data.genre && data.genre._id);
+            const typeCat = data.categories.find(cat =>
+                cat && cat._id !== genreId && cat.name !== "男性向け" && cat.name !== "女性向け" && CHAT_TYPE_BY_NAME[cat.name]);
+            if (typeCat) {
+                updateData.chatType = CHAT_TYPE_BY_NAME[typeCat.name];
+            }
         }
 
         // 安心フィルター設定（isAdult）
@@ -441,6 +454,8 @@ GM_addStyle(`
             updateData.startingSets = updateData.startingSets.map(set => {
                 const newSet = { ...set };
                 delete newSet._id;
+                // 新API形式では id という名前で入っていることがあり、残すと「すでに使用中の初期設定です」になるため両方消す
+                delete newSet.id;
                 newSet.situationImages = updateData.situationImages;
                 newSet.keywordBook = updateData.keywordBook;
                 return newSet;
@@ -479,30 +494,40 @@ GM_addStyle(`
 
             const updateData = buildUpdateData(data);
 
+            // 別のキャラのデータを貼る場合、スタート設定の baseSetId がコピー元のままだと
+            // サーバーが「すでに使用中の初期設定です」と返すため取り除く（同じキャラの再公開では保持する）
+            if (data._id && data._id !== characterId && Array.isArray(updateData.startingSets)) {
+                updateData.startingSets = updateData.startingSets.map(set => {
+                    const newSet = { ...set };
+                    delete newSet.baseSetId;
+                    return newSet;
+                });
+            }
+
             let url, method, response;
 
             if (isNew) {
                 // 新規キャラクターの場合: POST /story-drafts/v2 で下書き保存
-                url = `${API_BASE_URL}/kyarapu-api/story-drafts/v2`; 
+                url = `${API_BASE_URL}/kyarapu-api/story-drafts/v2`;
                 method = 'POST';
-                
+
                 // 下書き保存用のデータ形式（characterIdを追加）
                 const draftData = {
                     storyId: characterId,
                     characterId: characterId,
                     ...updateData
                 };
-                
+
                 log(`下書き保存: POST ${url}`);
                 console.log("下書き保存データ:", draftData);
                 response = await authFetch(method, url, draftData);
-                
+
                 if (response && response.data) {
-                    log(`下書き保存成功: storyDraftId=${response.data.storyDraftId ?? response.data.characterDraftId}`);
+                    log(`下書き保存成功: characterDraftId=${response.data.characterDraftId}`);
                 }
             } else {
                 // 既存キャラクターの場合: PATCH /stories/{id}/v2 で更新
-                url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}/v2`; 
+                url = `${API_BASE_URL}/kyarapu-api/stories/${characterId}/v2`;
                 method = 'PATCH';
                 log(`キャラ更新: PATCH ${url}`);
                 response = await authFetch(method, url, updateData);
@@ -655,7 +680,7 @@ GM_addStyle(`
 
         try {
             await updateCharacterData(characterId, pasteData);
-            
+
             if (isNewCharacter()) {
                 // 新規キャラの場合は下書き保存状態になる
                 alert("✅ キャラクターデータを下書き保存しました。\n\n⚠️ キャラクターを登録するには、ページ更新後に画面上部の「登録」ボタンを押してください。");
@@ -771,7 +796,7 @@ GM_addStyle(`
                     }
 
                     await updateCharacterData(characterId, characterData);
-                    
+
                     if (isNewCharacter()) {
                         // 新規キャラの場合は下書き保存状態になる
                         alert("✅ インポートして下書き保存しました。\n\n⚠️ キャラクターを登録するには、ページ更新後に画面上部の「登録」ボタンを押してください。");
@@ -1005,7 +1030,7 @@ GM_addStyle(`
 
     function initialize() {
         log(`初期化開始: ${location.href}`);
-        
+
         // 初回実行
         createUI();
 
