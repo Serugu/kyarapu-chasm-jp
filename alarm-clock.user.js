@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name        Kyarapu Crystallized AlarmClock
 // @namespace   https://github.com/Serugu/kyarapu-chasm-jp
-// @version     KYR-ALRM-v1.1.0
+// @version     KYR-ALRM-v1.1.1
 // @description 毎日の出席通知と即時出席ボタンを追加します。
 // @author      milkyway0308 (Original), Serugu (JP Port)
 // @match       https://kyarapu.com/*
+// @downloadURL https://github.com/Serugu/kyarapu-chasm-jp/raw/main/alarm-clock.user.js
+// @updateURL   https://github.com/Serugu/kyarapu-chasm-jp/raw/main/alarm-clock.user.js
 // @require     https://cdn.jsdelivr.net/npm/dexie@latest/dist/dexie.js
 // @grant       GM_addStyle
 // ==/UserScript==
