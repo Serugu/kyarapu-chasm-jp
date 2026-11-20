@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Kyarapu Chasm Neo-Copy
 // @namespace   https://github.com/chasm-js
-// @version     KYARAPU-NCPY-v1.2.7
+// @version     KYARAPU-NCPY-v1.2.8
 // @description キャラプのキャラクター複製/貼り付け/再公開/エクスポート/インポート機能を提供します。韓国版Crystallized Chasmの日本版移植です。
 // @author      chasm-js, milkyway0308, Serugu
 // @match       https://kyarapu.com/*
@@ -10,7 +10,7 @@
 // @grant       GM_addStyle
 // ==/UserScript==
 
-const VERSION = "KYARAPU-NCPY-v1.2.7";
+const VERSION = "KYARAPU-NCPY-v1.2.8";
 
 GM_addStyle(`
     #chasm-neocopy-menu {
@@ -429,6 +429,25 @@ GM_addStyle(`
             updateData.promptTemplate = data.promptTemplate;
         } else {
             updateData.promptTemplate = "custom";
+        }
+
+        // 新形式のキャラでは全体の situationImages / keywordBook が空で、
+        // 実データがスタート設定の中にだけ入っていることがある。
+        // その場合はスタート設定側から拾って全体分とする
+        // （画像とキーワードブックは全スタート設定共通のリストが複製されている形のため）
+        if (Array.isArray(data.startingSets)) {
+            if (!updateData.situationImages || updateData.situationImages.length === 0) {
+                const fromSet = data.startingSets.find(set => Array.isArray(set.situationImages) && set.situationImages.length > 0);
+                if (fromSet) {
+                    updateData.situationImages = fromSet.situationImages;
+                }
+            }
+            if (!updateData.keywordBook || updateData.keywordBook.length === 0) {
+                const fromSet = data.startingSets.find(set => Array.isArray(set.keywordBook) && set.keywordBook.length > 0);
+                if (fromSet) {
+                    updateData.keywordBook = fromSet.keywordBook;
+                }
+            }
         }
 
         // situationImagesの処理（UI用の項目を削除。ぼかし画像はサイトと同じく、あれば送る）
